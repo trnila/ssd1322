@@ -35,7 +35,7 @@ pub mod spi {
     impl<SPI, DC> SpiInterface<SPI, DC>
     where
         SPI: hal::spi::FullDuplex<u8>,
-        DC: hal::digital::OutputPin,
+        DC: hal::digital::v2::OutputPin,
     {
         /// Create a new SPI interface to communicate with the display driver. `spi` is the SPI
         /// master device, and `dc` is the GPIO output pin connected to the D/C pin of the SSD1322.
@@ -47,21 +47,21 @@ pub mod spi {
     impl<SPI, DC> DisplayInterface for SpiInterface<SPI, DC>
     where
         SPI: hal::spi::FullDuplex<u8>,
-        DC: hal::digital::OutputPin,
+        DC: hal::digital::v2::OutputPin,
     {
         /// Send a command word to the display's command register. Synchronous.
         fn send_command(&mut self, cmd: u8) -> Result<(), ()> {
             // The SPI device has FIFOs that we must ensure are drained before the bus will
             // quiesce. This must happen before asserting DC for a command.
             while let Ok(_) = self.spi.read() {
-                self.dc.set_high();
+                self.dc.set_high().map_err(|_| ())?;
             }
-            self.dc.set_low();
+            self.dc.set_low().map_err(|_| ())?;
             let bus_op = match block!(self.spi.send(cmd)) {
                 Ok(()) => block!(self.spi.read()).map_err(|_| ()).map(|_| ()),
                 Err(_) => Err(()),
             };
-            self.dc.set_high();
+            self.dc.set_high().map_err(|_| ())?;
             bus_op
         }
 
